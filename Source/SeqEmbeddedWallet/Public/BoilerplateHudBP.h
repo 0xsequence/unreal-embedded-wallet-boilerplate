@@ -28,15 +28,34 @@ protected:
 	UTextBlock* SignedMessage;
 
 	UPROPERTY(meta = (BindWidget))
+	UTextBlock* LogMessage;
+
+	UPROPERTY(meta = (BindWidget))
 	UEditableTextBox* MessageInput;
+
+	UPROPERTY(meta = (BindWidget))
+	UEditableTextBox* ToAddressInput;
+
+	UPROPERTY(meta = (BindWidget))
+	UEditableTextBox* TokenAddressInput;
+
+	UPROPERTY(meta = (BindWidget))
+	UEditableTextBox* TransactionValueInput;
 
 	UPROPERTY(meta = (BindWidget))
 	UButton* SignMessageButton;
 
+	UPROPERTY(meta = (BindWidget))
+	UButton* SendTransactionButton;
+
 	UFUNCTION()
-	void OnButtonClicked();
+	void OnSignMessageClicked();
+
+	UFUNCTION()
+	void OnSendTransactionClicked();
 
 private:
 	void UpdateAddress();
 	void UpdateBalance();
+	void Log(const FString& Message);
 };

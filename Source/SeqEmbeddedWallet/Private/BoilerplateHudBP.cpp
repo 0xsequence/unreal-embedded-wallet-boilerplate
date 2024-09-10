@@ -11,47 +11,95 @@ void UBoilerplateHudBP::NativeConstruct()
 
 	if (SignMessageButton)
 	{
-		SignMessageButton->OnClicked.AddDynamic(this, &UBoilerplateHudBP::OnButtonClicked);
+		SignMessageButton->OnClicked.AddDynamic(this, &UBoilerplateHudBP::OnSignMessageClicked);
+	}
+
+	if (SendTransactionButton)
+	{
+		SendTransactionButton->OnClicked.AddDynamic(this, &UBoilerplateHudBP::OnSendTransactionClicked);
 	}
 }
 
-void UBoilerplateHudBP::OnButtonClicked()
+void UBoilerplateHudBP::OnSignMessageClicked()
 {
 	if (!this->MessageInput)
 	{
-		UE_LOG(LogTemp, Display, TEXT("BoilerplateHud.MessageInput is undefined."));
+		this->Log("ERROR: BoilerplateHud.MessageInput is undefined.");
 		return;
 	}
 
-	const FString MessageInputText = this->MessageInput->GetText().ToString();
+	const FString& MessageInputText = this->MessageInput->GetText().ToString();
 	const TOptional<USequenceWallet*> WalletOptional = USequenceWallet::Get();
-	
-	if (WalletOptional.IsSet())
+
+	if (!WalletOptional.IsSet())
 	{
-		const USequenceWallet* Wallet = WalletOptional.GetValue();
-		Wallet->SignMessage(MessageInputText, [this, &MessageInputText](const FSeqSignMessageResponse_Response& Response)
-		{
-			const FString& SignedMessageText = *Response.Data.Message;
-			if (this->SignedMessage)
-			{
-				this->SignedMessage->SetText(FText::FromString("Signed Message: " + SignedMessageText));
-			}
-			
-			UE_LOG(LogTemp, Display, TEXT("Successfully signed message '%s': %s"), *MessageInputText, *SignedMessageText);
-		},
-		[this, &MessageInputText](const FSequenceError& Error)
-		{
-			UE_LOG(LogTemp, Error, TEXT("Failed to sign message '%s', error: %s"), *MessageInputText, *Error.Message);
-		});
+		this->Log("ERROR: Failed to get stored wallet.");
+		return;
 	}
+
+	const USequenceWallet* Wallet = WalletOptional.GetValue();
+	Wallet->SignMessage(MessageInputText, [this, MessageInputText](const FSeqSignMessageResponse_Response& Response)
+	{
+		const FString& SignedMessageText = *Response.Data.Message;
+		if (this->SignedMessage)
+		{
+			this->SignedMessage->SetText(FText::FromString("Signed Message: " + SignedMessageText));
+		}
+			
+		this->Log(FString::Printf(TEXT("SUCCESS: Signed message '%s': %s"), *MessageInputText, *SignedMessageText));
+	},
+	[this, &MessageInputText](const FSequenceError& Error)
+	{
+		this->Log(FString::Printf(TEXT("ERROR: While signing message '%s', error: %s"), *MessageInputText, *Error.Message));
+	});
 }
+
+void UBoilerplateHudBP::OnSendTransactionClicked()
+{
+	if (!ToAddressInput || !TokenAddressInput || !TransactionValueInput)
+	{
+		this->Log("ERROR: ToAddressInput, TokenAddressInput or TransactionValueInput is undefined.");
+		return;
+	}
+	
+	const TOptional<USequenceWallet*> WalletOptional = USequenceWallet::Get();
+	if (!WalletOptional.IsSet())
+	{
+		this->Log("ERROR: Failed to get stored wallet.");
+		return;
+	}
+
+	const USequenceWallet* Wallet = WalletOptional.GetValue();
+	const FString ToAddress = ToAddressInput->GetText().ToString();
+	const FString TokenAddress = TokenAddressInput->GetText().ToString();
+	const FString TransactionValue = TransactionValueInput->GetText().ToString();
+
+	TArray<TUnion<FRawTransaction, FERC20Transaction, FERC721Transaction, FERC1155Transaction, FDelayedTransaction>> Txn;
+
+	FERC20Transaction T20;
+	T20.to = ToAddress;
+	T20.tokenAddress = TokenAddress;
+	T20.value = TransactionValue;
+ 
+	Txn.Push(TUnion<FRawTransaction, FERC20Transaction, FERC721Transaction, FERC1155Transaction, FDelayedTransaction>(T20));
+	
+	Wallet->SendTransaction(Txn, [this](const FSeqTransactionResponse_Data Data)
+	{
+		this->Log(FString::Printf(TEXT("SUCCESS: Sending transaction: %s"), *Data.TxHash));
+	},
+	[this](const FSequenceError& Error)
+	{
+		this->Log(FString::Printf(TEXT("ERROR: Failed to send transaction %s"), *Error.Message));
+	});
+}
+
 
 void UBoilerplateHudBP::UpdateAddress()
 {
 	const TOptional<USequenceWallet*> WalletOptional = USequenceWallet::Get();
 	if (!WalletOptional.IsSet())
 	{
-		UE_LOG(LogTemp, Error, TEXT("Failed to get stored wallet."));
+		this->Log("ERROR: Failed to get stored wallet.");
 		return;
 	}
 
@@ -69,7 +117,7 @@ void UBoilerplateHudBP::UpdateBalance()
 	const TOptional<USequenceWallet*> WalletOptional = USequenceWallet::Get();
 	if (!WalletOptional.IsSet())
 	{
-		UE_LOG(LogTemp, Error, TEXT("Failed to get stored wallet."));
+		this->Log("ERROR: Failed to get stored wallet.");
 		return;
 	}
 	
@@ -84,8 +132,20 @@ void UBoilerplateHudBP::UpdateBalance()
 			this->EtherBalance->SetText(FText::FromString(BalanceText));
 		}
 	},
-	[Address](const FSequenceError& Error)
+	[this, Address](const FSequenceError& Error)
 	{
-		UE_LOG(LogTemp, Error, TEXT("Failed to get ether balance for address '%s', error: %s"), *Address, *Error.Message);
+		this->Log(FString::Printf(TEXT("ERROR: While getting ether balance for address '%s, error: %s"), *Address, *Error.Message));
 	});
 }
+
+// Let's print the log and display it to the user
+void UBoilerplateHudBP::Log(const FString& Message)
+{
+	if (this->LogMessage)
+	{
+		this->LogMessage->SetText(FText::FromString(Message));
+	}
+	
+	UE_LOG(LogTemp, Display, TEXT("%s"), *Message);
+}
+
