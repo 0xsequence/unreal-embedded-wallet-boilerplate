@@ -57,5 +57,5 @@ protected:
 private:
 	void UpdateAddress();
 	void UpdateBalance();
-	void Log(const FString& Message);
+	void Log(const FString& Message) const;
 };
