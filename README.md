@@ -29,4 +29,6 @@ Check out the `BoilerplateHudBP.cpp` file to see how it’s integrated.
 1. Clone the repository
 2. Open the project from the `.uproject` file or the `Epic Games Launcher`
 3. Compile the projects source code 
-4. Hit Play & Sign In 
+4. Hit Play & Sign In
+
+[assets/video.mp4](https://github.com/user-attachments/assets/256076de-1361-47df-af67-1e46e7e65a54)
