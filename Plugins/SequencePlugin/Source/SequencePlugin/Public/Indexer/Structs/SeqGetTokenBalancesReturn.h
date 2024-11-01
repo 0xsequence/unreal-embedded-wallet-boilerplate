@@ -5,6 +5,8 @@
 #include "SeqPage.h"
 #include "Util/SequenceSupport.h"
 #include "SeqTokenBalance.h"
+#include "Dom/JsonObject.h"
+#include "Dom/JsonValue.h"
 #include "SeqGetTokenBalancesReturn.generated.h"
 
 USTRUCT(BlueprintType)
@@ -50,7 +52,7 @@ public:
                 const TSharedPtr<FJsonObject>* itemObj;
                 if ((*lst)[i].Get()->TryGetObject(itemObj))
                 {
-                    balances[i].setup(*itemObj->Get());
+                    balances[i].Setup(*itemObj->Get());
                 }
             }
         }

@@ -4,6 +4,7 @@
 #include "CoreMinimal.h"
 #include "SeqContractInfo.h"
 #include "SeqTokenMetaData.h"
+#include "Dom/JsonObject.h"
 #include "SeqTokenSupply.generated.h"
 
 USTRUCT(BlueprintType)
@@ -45,7 +46,7 @@ public:
         const TSharedPtr<FJsonObject>* itemObj;
         if (json_in.TryGetObjectField(TEXT("tokenMetaData"), itemObj))
         {
-            tokenMetaData.setup(*itemObj->Get());
+            tokenMetaData.Setup(*itemObj->Get());
         }
     }
 };

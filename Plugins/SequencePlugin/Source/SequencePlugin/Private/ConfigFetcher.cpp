@@ -3,7 +3,7 @@
 #include "ConfigFetcher.h"
 #include "Misc/ConfigCacheIni.h"
 #include "CoreGlobals.h"
-
+	
 FString UConfigFetcher::GetConfigVar(const FString& ConfigKey)
 {
 	if(!GConfig)
@@ -11,7 +11,7 @@ FString UConfigFetcher::GetConfigVar(const FString& ConfigKey)
 		UE_LOG(LogTemp, Error, TEXT("[GConfig Error]"));
 		return "";
 	}
-
+ 
 	FString value;
 	const FString Section = "/Script/Sequence.Config";
 	const FString Filename = FConfigCacheIni::NormalizeConfigIniPath(FPaths::ProjectConfigDir() + TEXT("/SequenceConfig.ini"));

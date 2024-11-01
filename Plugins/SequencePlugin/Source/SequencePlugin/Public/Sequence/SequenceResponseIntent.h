@@ -3,9 +3,96 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "Sequence/FeeOption.h"
+#include "Sequence/SequenceFederationSupport.h"
 #include "SequenceResponseIntent.generated.h"
 
-//FederateAccount//
+//Error Response//
+//{"error":"EmailAlreadyInUse","code":7000,"msg":"Could not create account as the email is already in use","cause":"OIDC|testbed995@gmail.com|https://accounts.google.com","status":409}
+
+USTRUCT()
+struct SEQUENCEPLUGIN_API FErrorResponse
+{
+	GENERATED_USTRUCT_BODY()
+
+	UPROPERTY()
+	FString Error = "";
+	UPROPERTY()
+	int32 Code = -1;
+	UPROPERTY()
+	FString Msg = "";
+	UPROPERTY()
+	FString Cause = "";
+	UPROPERTY()
+	int32 Status = -1;
+	
+	bool IsEmailInUseError() const
+	{
+		return Error.Equals(TEXT("EmailAlreadyInUse"),ESearchCase::IgnoreCase);
+	}
+	
+	FString ParseCauseForRequiredEmail() const
+	{
+		FString Email = "";
+
+		TArray<FString> PreParsed;
+		Cause.ParseIntoArray(PreParsed,TEXT(","));
+
+		for (FString Entry : PreParsed)
+		{
+			TArray<FString> PostParsed;
+			Entry.ParseIntoArray(PostParsed,TEXT("|"));
+
+			if (PostParsed.Num() >= 2)
+			{
+				Email = PostParsed[1];
+				break;
+			}
+		}
+		
+		return Email;
+	}
+	
+	TArray<TEnumAsByte<ESequenceLoginType>> ParseCauseForAccountUsage() const
+	{
+		TArray<TEnumAsByte<ESequenceLoginType>> AccountTypes;
+
+		TArray<FString> PreParsed;
+		Cause.ParseIntoArray(PreParsed,TEXT(","));
+
+		for (FString Entry : PreParsed)
+		{
+			TArray<FString> PostParsed;
+			Entry.ParseIntoArray(PostParsed,TEXT("|"));
+			if (PostParsed.Num() >= 2)
+			{
+				if (PostParsed[0].Equals(TEXT("Email"),ESearchCase::IgnoreCase))
+				{
+					AccountTypes.Add(ESequenceLoginType::Email);
+				}
+				else if (PostParsed[0].Equals(TEXT("PlayFab"), ESearchCase::IgnoreCase))
+				{
+					AccountTypes.Add(ESequenceLoginType::PlayFab);
+				}
+				else if (PostParsed[0].Equals(TEXT("OIDC"),ESearchCase::IgnoreCase) && PostParsed.Num() >= 3)
+				{
+					//Now we check which type of OIDC
+					if (PostParsed[2].Contains(TEXT("apple"),ESearchCase::IgnoreCase))
+					{
+						AccountTypes.Add(ESequenceLoginType::OIDC_Apple);
+					}
+					else if (PostParsed[2].Contains(TEXT("google"),ESearchCase::IgnoreCase))
+					{
+						AccountTypes.Add(ESequenceLoginType::OIDC_Google);
+					}
+				}
+			}
+		}
+		
+		return AccountTypes;
+	}
+};
+
+//Error Response//
 
 USTRUCT()
 struct SEQUENCEPLUGIN_API FFederateAccountResponse_Account
@@ -13,22 +100,52 @@ struct SEQUENCEPLUGIN_API FFederateAccountResponse_Account
 	GENERATED_USTRUCT_BODY()
 
 	UPROPERTY()
-	FString Email = "";
-	UPROPERTY()
 	FString Id = "";
 	UPROPERTY()
-	FString IdentityType = "";
+	FString Type = "";
 	UPROPERTY()
-	FString Answer = "";
+	FString Issuer = "";
+	UPROPERTY()
+	FString Email = "";
 };
 
 USTRUCT()
-struct SEQUENCEPLUGIN_API FFederateAccountResponse//_Data
+struct SEQUENCEPLUGIN_API FFederateAccountResponse_Data
 {
 	GENERATED_USTRUCT_BODY()
 
 	UPROPERTY()
 	FFederateAccountResponse_Account Account;
+};
+
+USTRUCT()
+struct SEQUENCEPLUGIN_API FFederateAccountResponse_Response
+{
+	GENERATED_USTRUCT_BODY()
+
+	UPROPERTY()
+	FString Code = "";
+	UPROPERTY()
+	FFederateAccountResponse_Data Data;
+
+	bool IsValid() const
+	{
+		return Code.Equals(TEXT("accountFederated"),ESearchCase::IgnoreCase);
+	}
+};
+
+USTRUCT()
+struct SEQUENCEPLUGIN_API FFederateAccountResponse
+{
+	GENERATED_USTRUCT_BODY()
+	
+	UPROPERTY()
+	FFederateAccountResponse_Response Response;
+
+	bool IsValid() const
+	{
+		return Response.IsValid();
+	}
 };
 
 //FederateAccount//
@@ -369,6 +486,92 @@ struct SEQUENCEPLUGIN_API FSeqSignMessageResponse
 
 //SignMessage//
 
+
+//GetIdToken//
+
+USTRUCT(Blueprintable)
+struct SEQUENCEPLUGIN_API FSeqIdTokenResponse_Data
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Default")
+	FString IdToken;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Default")
+	int32 ExpiresIn;
+};
+
+
+
+USTRUCT(Blueprintable)
+struct SEQUENCEPLUGIN_API FSeqIdTokenResponse_Response
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FString Code = "";
+
+	UPROPERTY()
+	FSeqIdTokenResponse_Data Data;
+
+
+	bool IsValid() const
+	{
+		return Code.Equals(TEXT("idToken"), ESearchCase::IgnoreCase);
+
+	}
+};
+
+
+USTRUCT(Blueprintable)
+struct SEQUENCEPLUGIN_API FSeqIdTokenResponse
+{
+	GENERATED_BODY()
+
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Default")
+	FSeqIdTokenResponse_Response Response;
+
+	bool IsValid() const
+	{
+		return Response.IsValid();
+	}
+};
+
+
+//Validate Signature//
+
+USTRUCT(Blueprintable)
+struct SEQUENCEPLUGIN_API FSeqValidateMessageSignatureResponse_Data
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Default")
+	bool isValid;
+
+	bool IsValid() const
+	{
+		return isValid;
+	}
+};
+
+
+
+USTRUCT()
+struct SEQUENCEPLUGIN_API FSeqValidateMessageSignatureResponse
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FSeqValidateMessageSignatureResponse_Data Data;
+
+	bool IsValid() const
+	{
+		return Data.IsValid();
+	}
+};
+ 
+// 
 //ListSessions//
 
 USTRUCT(Blueprintable)
@@ -418,7 +621,7 @@ struct SEQUENCEPLUGIN_API FSeqListSessionResponse_Response
 
 	bool IsValid() const
 	{
-		return Code.Equals(TEXT("sessionList"),ESearchCase::IgnoreCase);
+		return Code.Equals(TEXT("session"),ESearchCase::IgnoreCase);
 	}
 };
 
@@ -436,4 +639,111 @@ struct SEQUENCEPLUGIN_API FSeqListSessionsResponse
 	}
 };
 
+USTRUCT(Blueprintable)
+struct SEQUENCEPLUGIN_API FSeqAccount
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Default")
+	FString Id = "";
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Default")
+	FString Type = "";
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Default")
+	FString Issuer = "";
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Default")
+	FString Email = "";
+
+
+};
+
+USTRUCT(Blueprintable)
+struct SEQUENCEPLUGIN_API FSeqListAccountsResponse_Data
+{
+	GENERATED_BODY()
+	
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Default")
+	TArray<FSeqAccount> Accounts;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Default")
+	FString CurrentAccountId = "";
+};
+
+
+
+USTRUCT()
+struct SEQUENCEPLUGIN_API FSeqListAccountsResponse_Response
+{
+	GENERATED_BODY()
+	UPROPERTY()
+	FString Code = "";
+	UPROPERTY()
+	FSeqListAccountsResponse_Data Data;
+
+	bool IsValid() const
+	{
+		return Code.Equals(TEXT("accountList"), ESearchCase::IgnoreCase);
+	}
+};
+
+USTRUCT()
+struct SEQUENCEPLUGIN_API FSeqListAccountsResponse
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FSeqListAccountsResponse_Response Response;
+
+	bool IsValid() const
+	{
+		return Response.IsValid();
+	}
+};
+
+
 //ListSessions//
+
+
+USTRUCT(Blueprintable)
+struct SEQUENCEPLUGIN_API FSeqGetSessionAuthProof_Data
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Default")
+	FString SessionId;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Default")
+	FString Network;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Default")
+	FString Wallet;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Default")
+	FString Message; 	//The message contents : �SessionAuthProof <sessionId> <wallet> <nonce ? >� hex encoded
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Default")
+	FString Signature;
+};
+
+USTRUCT()
+struct SEQUENCEPLUGIN_API FSeqGetSessionAuthProofResponse_Response
+{
+	GENERATED_BODY()
+	UPROPERTY()
+	FString Code = "";
+	UPROPERTY()
+	FSeqGetSessionAuthProof_Data Data;
+
+	bool IsValid() const
+	{
+		return Code.Equals(TEXT("sessionAuthProof"), ESearchCase::IgnoreCase);
+	}
+};
+
+USTRUCT()
+struct SEQUENCEPLUGIN_API FSeqGetSessionAuthProofResponse
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FSeqGetSessionAuthProofResponse_Response Response;
+
+	bool IsValid() const
+	{
+		return Response.IsValid();
+	}
+};
