@@ -1,10 +1,10 @@
 # Sequence Unreal Embedded Wallet Boilerplate
 
-Built with Unreal Engine 5.4.4 & Sequence SDK 1.2.1
+Built with Unreal Engine 5.4.4 & Sequence SDK 1.4.1
 
 ### General
 
-- Chain: Sepolia Testnet
+- Chain: Arbitrum Sepolia
 - Minimum Unreal Engine Version: 5.4.0
 - Minimum Android SDK Version: 34
 
@@ -17,12 +17,12 @@ Built with Unreal Engine 5.4.4 & Sequence SDK 1.2.1
 
 ### Features
 
-Check out the `BoilerplateHudBP.cpp` file to see how it’s integrated.
+Check out the `BoilerplateHud.uasset` file to see how it’s integrated.
 
 - Create your own wallet by signing in as a Guest, or using Google, Apple, or Email.
 - View your wallet address and balance.
 - Sign a message
-- Send an ERC20 transaction with fee options
+- Send Ether Balance to another wallet
 
 ### Run the Boilerplate
 
