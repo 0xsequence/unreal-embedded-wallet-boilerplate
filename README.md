@@ -1,21 +1,19 @@
 # Sequence Unreal Embedded Wallet Boilerplate
 
+[![Docs](https://img.shields.io/badge/Documentation-7334f8)](https://docs.sequence.xyz/sdk/unreal/introduction)
+[![SDK](https://img.shields.io/badge/Unreal%20SDK-7334f8)](https://github.com/0xsequence/sequence-unreal)
+
 Built with Unreal Engine 5.4.4 & Sequence SDK 1.4.1
+Chain: Arbitrum Sepolia
 
-### General
+## Supported Platforms
 
-- Chain: Arbitrum Sepolia
-- Minimum Unreal Engine Version: 5.4.0
-- Minimum Android SDK Version: 34
-
-### Supported Platforms
-
-- MacOS
-- Windows
+- Mac Standalone
+- Windows Standalone
 - iOS
 - Android
 
-### Features
+## Features
 
 Check out the `BoilerplateHud.uasset` file to see how it’s integrated.
 
@@ -24,11 +22,9 @@ Check out the `BoilerplateHud.uasset` file to see how it’s integrated.
 - Sign a message
 - Send Ether Balance to another wallet
 
-### Run the Boilerplate
+## Run the Boilerplate
 
 1. Clone the repository
 2. Open the project from the `.uproject` file or the `Epic Games Launcher`
 3. Compile the projects source code 
 4. Hit Play & Sign In
-
-[assets/video.mp4](https://github.com/user-attachments/assets/256076de-1361-47df-af67-1e46e7e65a54)
