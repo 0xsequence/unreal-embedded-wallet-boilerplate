@@ -3,7 +3,7 @@
 [![Docs](https://img.shields.io/badge/Documentation-7334f8)](https://docs.sequence.xyz/sdk/unreal/introduction)
 [![SDK](https://img.shields.io/badge/Unreal%20SDK-7334f8)](https://github.com/0xsequence/sequence-unreal)
 
-Built with Unreal Engine 5.4.4 & Sequence SDK 1.4.1
+Built with Unreal Engine 5.4.4 & Sequence SDK 1.5.0
 Chain: Arbitrum Sepolia
 
 ## Supported Platforms
