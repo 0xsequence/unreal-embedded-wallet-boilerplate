@@ -1,30 +1,28 @@
 # Sequence Unreal Embedded Wallet Boilerplate
 
-[![Docs](https://img.shields.io/badge/Documentation-7334f8)](https://docs.sequence.xyz/sdk/unreal/introduction)
+[![Docs](https://img.shields.io/badge/Documentation-7334f8)](https://docs.sequence.xyz/sdk/unreal/overview)
 [![SDK](https://img.shields.io/badge/Unreal%20SDK-7334f8)](https://github.com/0xsequence/sequence-unreal)
 
-Built with Unreal Engine 5.4.4 & Sequence SDK 1.5.0
-Chain: Arbitrum Sepolia
+Built with Unreal Engine 5.4 & Sequence Unreal SDK 2.0.1
 
 ## Supported Platforms
 
-- Mac Standalone
-- Windows Standalone
-- iOS
-- Android
+![Mac](https://img.shields.io/badge/Mac-6c5d8c)
+![Windows](https://img.shields.io/badge/Windows-6c5d8c)
+![Android](https://img.shields.io/badge/Android-6c5d8c)
+![iOS](https://img.shields.io/badge/iOS-6c5d8c)
 
-## Features
+## How it works
 
-Check out the `BoilerplateHud.uasset` file to see how it’s integrated.
+This project defines its own Game Mode `GM_EmbeddedWallet` and Pawn `Pawn_EmbeddedWallet`.
+Use them as a starting point to define your own logic.
 
-- Create your own wallet by signing in as a Guest, or using Google, Apple, or Email.
-- View your wallet address and balance.
-- Sign a message
-- Send Ether Balance to another wallet
+The pawn uses our built-in [Boilerplates.](https://docs.sequence.xyz/sdk/unreal/bootstrap_game) Feel free
+to duplicate them into your project and adjust them to your needs.
 
 ## Run the Boilerplate
 
-1. Clone the repository
-2. Open the project from the `.uproject` file or the `Epic Games Launcher`
-3. Compile the projects source code 
+1. Clone the repository & open the Unreal project
+3. Compile the project source code 
+4. Download and add your own [Sequence Config](https://docs.sequence.xyz/sdk/unreal/getting_started) from [Builder](https://sequence.build/)
 4. Hit Play & Sign In

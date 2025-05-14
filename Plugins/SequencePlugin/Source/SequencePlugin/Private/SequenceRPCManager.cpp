@@ -1,21 +1,23 @@
 // Copyright 2024 Horizon Blockchain Games Inc. All rights reserved.
 
 #include "SequenceRPCManager.h"
-
-#include "SequenceAuthenticator.h"
 #include "RequestHandler.h"
 #include "ConfigFetcher.h"
+#include "HttpModule.h"
 #include "Interfaces/IHttpResponse.h"
 #include "Types/BinaryData.h"
 #include "Misc/Base64.h"
 #include "Interfaces/IPluginManager.h"
-#include "Sequence/SequenceAPI.h"
+#include "Sequence/SequenceWallet.h"
 #include "Sequence/SequenceAuthResponseIntent.h"
 #include "Misc/DateTime.h"
+#include "Util/Log.h"
+#include "Sequence/SequenceSdk.h"
+#include "Util/CredentialsStorage.h"
 
 template<typename T> FString USequenceRPCManager::GenerateIntent(T Data, TOptional<int64> CurrentTime) const
 {
-	const int64 Issued = CurrentTime.IsSet() ? CurrentTime.GetValue() : FDateTime::UtcNow().ToUnixTimestamp() - 30;
+	const int64 Issued = CurrentTime.IsSet() ? CurrentTime.GetValue() : (FDateTime::UtcNow() + TimeShift).ToUnixTimestamp() - 30;
 	const int64 Expires = Issued + 86400;
 	FGenericData * LocalDataPtr = &Data;
 	const FString Operation = LocalDataPtr->Operation;
@@ -36,25 +38,33 @@ template<typename T> FString USequenceRPCManager::GenerateIntent(T Data, TOption
 	}
 }
 
-void USequenceRPCManager::SequenceRPC(const FString& Url, const FString& Content, const TSuccessCallback<FString>& OnSuccess, const FFailureCallback& OnFailure) const
+USequenceRPCManager::USequenceRPCManager()
 {
-	UE_LOG(LogTemp, Log, TEXT("URL set to: %s"), *Url);
-	UE_LOG(LogTemp, Log, TEXT("Request content set to: %s"), *Content);
-
-
-	NewObject<URequestHandler>()
-	->PrepareRequest()
-	->WithUrl(Url)
-	->WithHeader("Content-type", "application/json")
-	->WithHeader("Accept", "application/json")
-	->WithHeader("X-Access-Key", this->Cached_ProjectAccessKey)
-	->WithVerb("POST")
-	->WithContentAsString(Content)
-	->ProcessAndThen(OnSuccess, OnFailure);
+	this->Validator = NewObject<UResponseSignatureValidator>();
+	this->CredentialsStorage = NewObject<UCredentialsStorage>();
 }
 
-void USequenceRPCManager::SequenceRPC(const FString& Url, const FString& Content, const TFunction<void(FHttpResponsePtr)>& OnSuccess, const FFailureCallback& OnFailure) const
+void USequenceRPCManager::SequenceRPC(const FString& Url, const FString& Content, const TSuccessCallback<FString>& OnSuccess, const FFailureCallback& OnFailure) const
 {
+	UResponseSignatureValidator& RPCValidator = *Validator;
+	SEQ_LOG_EDITOR(Display, TEXT("%s - %s"), *Url, *Content);
+	
+	NewObject<URequestHandler>()
+		->PrepareRequest()
+		->WithUrl(Url)
+		->WithHeader("Content-type", "application/json")
+		->WithHeader("Accept", "application/json")
+		->WithHeader("X-Access-Key", this->Cached_ProjectAccessKey)
+		->WithHeader("Accept-Signature", "sig=()")
+		->WithVerb("POST")
+		->WithContentAsString(Content)
+		->ProcessAndThen(RPCValidator,OnSuccess, OnFailure);
+}
+
+void USequenceRPCManager::SequenceRPC(const FString& Url, const FString& Content, const TSuccessCallback<FHttpResponsePtr>& OnSuccess, const FFailureCallback& OnFailure) const
+{
+	SEQ_LOG_EDITOR(Display, TEXT("%s - %s"), *Url, *Content);
+	
 	NewObject<URequestHandler>()
 	->PrepareRequest()
 	->WithUrl(Url)
@@ -71,36 +81,41 @@ void USequenceRPCManager::SendIntent(const FString& Url, TFunction<FString(TOpti
 {
 	this->SequenceRPC(Url, ContentGenerator(TOptional<int64>()), [this, Url, ContentGenerator, OnSuccess, OnFailure](FHttpResponsePtr Response)
 	{
-		UE_LOG(LogTemp, Display, TEXT("SUCCESS"));
-		UE_LOG(LogTemp, Display, TEXT("CONTENT"));
-		FString Content = UTF8ToString(FUnsizedData(Response.Get()->GetContent()));
-		UE_LOG(LogTemp, Display, TEXT("%s"), *Content);
+		const FString Content = UTF8ToString(FUnsizedData(Response.Get()->GetContent()));
+		const int32 Code = Response.Get()->GetResponseCode();
+		
+		SEQ_LOG_EDITOR(Display, TEXT("%d %s"), Code, *Content);
 
-		if(Content.Contains("intent is invalid: intent expired") || Content.Contains("intent is invalid: intent issued in the future"))
+		OnSuccess(Content);
+	}, [this, Url, ContentGenerator, OnSuccess, OnFailure](const FSequenceError& Error)
+	{
+		const FString Content = Error.Response->GetContentAsString();
+		const int32 Code = Error.Response->GetResponseCode();
+		SEQ_LOG_EDITOR(Error, TEXT("%d %s"), Code, *Content);
+		
+		if (!Content.Contains("intent is invalid: intent expired") &&
+			!Content.Contains("intent is invalid: intent issued in the future"))
 		{
-			FString Date = Response->GetHeader("Date");
-			FDateTime Time;
-			bool IsParsed = FDateTime::ParseHttpDate(Date, Time);
-
-			if(!IsParsed)
-			{
-				OnFailure(FSequenceError(FailedToParseIntentTime, "Failed to parse intent time " + Date));
-				return;
-			}
-			
-			UE_LOG(LogTemp, Display, TEXT("Resending intent with date %i"), Time.ToUnixTimestamp());
-			this->SequenceRPC(Url, ContentGenerator(TOptional(Time.ToUnixTimestamp())), OnSuccess, OnFailure);
+			OnFailure(Error);
+			return;
 		}
-		else
+		
+		FDateTime Time;
+		const FString Date = Error.Response->GetHeader("Date");
+		if(!FDateTime::ParseHttpDate(Date, Time))
 		{
-			OnSuccess(Content);
+			OnFailure(FSequenceError(FailedToParseIntentTime, Error.Response, "Failed to parse intent time " + Date));
+			return;
 		}
-	}, OnFailure);
+					
+		UE_LOG(LogTemp, Display, TEXT("Resending intent with date %i"), Time.ToUnixTimestamp());
+		this->SequenceRPC(Url, ContentGenerator(TOptional(Time.ToUnixTimestamp())), OnSuccess, OnFailure);
+	});
 }
 
 FString USequenceRPCManager::BuildGetFeeOptionsIntent(const FCredentials_BE& Credentials, const TArray<TransactionUnion>& Transactions, TOptional<int64> CurrentTime) const
 {
-	const FGetFeeOptionsData GetFeeOptionsData(Credentials.GetNetworkString(),Transactions,Credentials.GetWalletAddress());
+	const FGetFeeOptionsData GetFeeOptionsData(SequenceSdk::GetChainIdString(),Transactions,Credentials.GetWalletAddress());
 	const FString Intent = this->GenerateIntent<FGetFeeOptionsData>(GetFeeOptionsData, CurrentTime);
 	return Intent;
 }
@@ -121,7 +136,7 @@ FString USequenceRPCManager::BuildSignMessageIntent(const FCredentials_BE& Crede
 	const FUnsizedData PayloadBytes = StringToUTF8(Payload);
 	const FString EIP_Message = "0x" + BytesToHex(PayloadBytes.Ptr(),PayloadBytes.GetLength());
 	
-	const FSignMessageData SignMessageData(EIP_Message,Credentials.GetNetworkString(),Credentials.GetWalletAddress());
+	const FSignMessageData SignMessageData(EIP_Message,SequenceSdk::GetChainIdString(),Credentials.GetWalletAddress());
 	const FString Intent = this->GenerateIntent<FSignMessageData>(SignMessageData, CurrentTime);
 
 	return Intent;
@@ -138,7 +153,7 @@ FString USequenceRPCManager::BuildValidateMessageSignatureIntent(const int64& Ch
 FString USequenceRPCManager::BuildSendTransactionIntent(const FCredentials_BE& Credentials, const TArray<TransactionUnion>& Transactions, TOptional<int64> CurrentTime) const
 {
 	const FString Identifier = "unreal-sdk-" + FDateTime::UtcNow().ToString() + "-" + Credentials.GetWalletAddress();
-	const FSendTransactionData SendTransactionData(Identifier,Credentials.GetNetworkString(),Transactions,Credentials.GetWalletAddress());
+	const FSendTransactionData SendTransactionData(Identifier,SequenceSdk::GetChainIdString(),Transactions,Credentials.GetWalletAddress());
 	const FString Intent = this->GenerateIntent<FSendTransactionData>(SendTransactionData, CurrentTime);
 	return Intent;
 }
@@ -146,7 +161,7 @@ FString USequenceRPCManager::BuildSendTransactionIntent(const FCredentials_BE& C
 FString USequenceRPCManager::BuildSendTransactionWithFeeIntent(const FCredentials_BE& Credentials, const TArray<TransactionUnion>& Transactions, const FString& FeeQuote, TOptional<int64> CurrentTime) const
 {
 	const FString Identifier = "unreal-sdk-" + FDateTime::UtcNow().ToString() + "-" + Credentials.GetWalletAddress();
-	const FSendTransactionWithFeeOptionData SendTransactionWithFeeOptionData(Identifier,Credentials.GetNetworkString(),Transactions,FeeQuote,Credentials.GetWalletAddress());
+	const FSendTransactionWithFeeOptionData SendTransactionWithFeeOptionData(Identifier,SequenceSdk::GetChainIdString(),Transactions,FeeQuote,Credentials.GetWalletAddress());
 	const FString Intent = this->GenerateIntent<FSendTransactionWithFeeOptionData>(SendTransactionWithFeeOptionData, CurrentTime);
 	return Intent;
 }
@@ -177,7 +192,7 @@ FString USequenceRPCManager::BuildListAccountsIntent(const FCredentials_BE& Cred
 
 FString USequenceRPCManager::BuildGetSessionAuthProofIntent(const FCredentials_BE& Credentials, const FString& Nonce, TOptional<int64> CurrentTime) const
 {
-	const FGetSessionAuthProofData GetSessionAuthProofData(Credentials.GetNetworkString(), Credentials.GetWalletAddress(), Nonce);
+	const FGetSessionAuthProofData GetSessionAuthProofData(SequenceSdk::GetChainIdString(), Credentials.GetWalletAddress(), Nonce);
 	const FString Intent = this->GenerateIntent<FGetSessionAuthProofData>(GetSessionAuthProofData, CurrentTime);
 	return Intent;
 }
@@ -257,39 +272,47 @@ void USequenceRPCManager::UpdateWithRandomSessionWallet()
 
 void USequenceRPCManager::UpdateWithStoredSessionWallet()
 {
-	const USequenceAuthenticator * Authenticator = NewObject<USequenceAuthenticator>();
-	if (FStoredCredentials_BE StoredCredentials = Authenticator->GetStoredCredentials(); StoredCredentials.GetValid())
+	if (FStoredCredentials_BE StoredCredentials = this->CredentialsStorage->GetStoredCredentials(); StoredCredentials.GetValid())
 	{
 		this->SessionWallet = StoredCredentials.GetCredentials().GetSessionWallet();
 	}
 	else
 	{
-		UE_LOG(LogTemp, Error, TEXT("Stored Credentials are Invalid, Please Login"));
+		SEQ_LOG(Error, TEXT("Stored Credentials are Invalid, Please Login"));
 	}
 }
 
 USequenceRPCManager* USequenceRPCManager::Make(const bool UseStoredSessionId)
 {
+	USequenceRPCManager* Manager = nullptr;
+	
 	if (UseStoredSessionId)
 	{
-		const USequenceAuthenticator * Authenticator = NewObject<USequenceAuthenticator>();
-		if (FStoredCredentials_BE StoredCredentials = Authenticator->GetStoredCredentials(); StoredCredentials.GetValid())
+		const UCredentialsStorage* CredentialsStorage = NewObject<UCredentialsStorage>();
+		if (FStoredCredentials_BE StoredCredentials = CredentialsStorage->GetStoredCredentials(); StoredCredentials.GetValid())
 		{
-			return Make(StoredCredentials.GetCredentials().GetSessionWallet());
+			Manager = Make(StoredCredentials.GetCredentials().GetSessionWallet());
 		}
 	}
-	return Make(UCryptoWallet::Make());
+	
+	if (!Manager)
+	{
+		Manager = Make(UCryptoWallet::Make());
+	}
+	
+	return Manager;
 }
 
 USequenceRPCManager* USequenceRPCManager::Make(UCryptoWallet* SessionWalletIn)
 {
-	USequenceRPCManager * SequenceRPCManager = NewObject<USequenceRPCManager>();
+	USequenceRPCManager* SequenceRPCManager = NewObject<USequenceRPCManager>();
 	SequenceRPCManager->SessionWallet = SessionWalletIn;
-
 	FString ParsedJwt;
-	FBase64::Decode(UConfigFetcher::GetConfigVar(UConfigFetcher::WaaSConfigKey),ParsedJwt);
+	FBase64::Decode(UConfigFetcher::GetConfigVar(UConfigFetcher::WaaSConfigKey), ParsedJwt);
 	SequenceRPCManager->WaaSSettings = USequenceSupport::JSONStringToStruct<FWaasJWT>(ParsedJwt);
 	SequenceRPCManager->Cached_ProjectAccessKey = UConfigFetcher::GetConfigVar(UConfigFetcher::ProjectAccessKey);
+	
+	SequenceRPCManager->InitializeTimeShift();
 	return SequenceRPCManager;
 }
 
@@ -326,7 +349,7 @@ void USequenceRPCManager::ValidateMessageSignature(const int64& ChainId, const F
 {
 	const TSuccessCallback<FString> OnResponse = [OnSuccess, OnFailure](const FString& Response)
 	{
-		UE_LOG(LogTemp, Log, TEXT("Response: %s"), *Response);
+		SEQ_LOG(Log, TEXT("Response: %s"), *Response);
 
 		const FSeqValidateMessageSignatureResponse ParsedResponse = USequenceSupport::JSONStringToStruct<FSeqValidateMessageSignatureResponse>(Response);
 
@@ -423,7 +446,7 @@ void USequenceRPCManager::GetFeeOptions(const FCredentials_BE& Credentials, cons
 			}
 			else
 			{
-				OnFailure(FSequenceError(RequestFail, "No fee options recieved, contract gas might be sponsored, check builder configs or use a non-fee options transaction. " + Response));
+				OnFailure(FSequenceError(RequestFail, "No fee options received, contract gas might be sponsored, check builder configs or use a non-fee options transaction. " + Response));
 
 			}
 			
@@ -512,7 +535,7 @@ void USequenceRPCManager::ListAccounts(const FCredentials_BE& Credentials, const
 		{
 			const FSeqListAccountsResponse ParsedResponse = USequenceSupport::JSONStringToStruct<FSeqListAccountsResponse>(Response);
 
-			UE_LOG(LogTemp, Log, TEXT("%s"), *Response);
+			SEQ_LOG(Log, TEXT("%s"), *Response);
 			if (ParsedResponse.IsValid())
 			{
 				OnSuccess(ParsedResponse.Response.Data);
@@ -942,6 +965,33 @@ void USequenceRPCManager::ForceOpenSessionInUse(const TSuccessCallback<FCredenti
 	}, OnOpenResponse, OnFailure);
 }
 
+void USequenceRPCManager::GetLinkedWallets(const FSeqLinkedWalletRequest& Request, const TSuccessCallback<FSeqLinkedWalletsResponse>& OnSuccess, const FFailureCallback& OnFailure) const
+{
+	const TSuccessCallback<FString> OnResponse = [this, OnSuccess](const FString& OnResponse)
+	{
+		const FSeqLinkedWalletsResponse LinkedWallets = USequenceSupport::JSONStringToStruct<FSeqLinkedWalletsResponse>(OnResponse);
+		OnSuccess(LinkedWallets);
+	};
+	
+	this->SendIntent(this->BuildAPIUrl("GetLinkedWallets"),[this, Request](const TOptional<int64>& CurrentTime)
+	{
+		return USequenceSupport::StructToString(Request);
+	}, OnResponse, OnFailure);
+}
+
+void USequenceRPCManager::RemoveLinkedWallet(const FSeqLinkedWalletRequest& Request, const TFunction<void()>& OnSuccess, const FFailureCallback& OnFailure) const
+{
+	const TSuccessCallback<FString> OnResponse = [this, OnSuccess](const FString& OnResponse)
+	{
+		OnSuccess();
+	};
+	
+	this->SendIntent(this->BuildAPIUrl("RemoveLinkedWallet"),[this, Request](const TOptional<int64>& CurrentTime)
+	{
+		return USequenceSupport::StructToString(Request);
+	}, OnResponse, OnFailure);
+}
+
 void USequenceRPCManager::FederateEmailSession(const FString& WalletIn, const FString& CodeIn, const TFunction<void()>& OnSuccess, const FFailureCallback& OnFailure)
 {
 	this->UpdateWithStoredSessionWallet();
@@ -1088,4 +1138,51 @@ void USequenceRPCManager::FederateSessionInUse(const FString& WalletIn, const TF
 	{
 		return this->BuildFederateAccountIntent(FederateAccountData, CurrentTime);
 	}, OnFederateResponse, OnFailure);
+}
+
+void USequenceRPCManager::InitializeTimeShift()
+{
+	const FString WaasUrl = this->WaaSSettings.GetRPCServer();
+	const FString StatusUrl = WaasUrl.EndsWith(TEXT("/")) ? WaasUrl + TEXT("status") : WaasUrl + TEXT("/status");
+
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
+	HttpRequest->SetVerb(TEXT("GET"));
+	HttpRequest->SetURL(StatusUrl);
+	
+	HttpRequest->OnProcessRequestComplete().BindLambda([this](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess)
+	{
+		if (bSuccess && Response.IsValid())
+		{
+			const FString DateHeader = Response->GetHeader(TEXT("date"));
+			if (!DateHeader.IsEmpty())
+			{
+				TimeShift = GetTimeShiftFromResponse(DateHeader);
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("No date header in response from status endpoint"));
+				TimeShift = FTimespan::Zero();
+			}
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Failed to get server time for time shift calculation"));
+			TimeShift = FTimespan::Zero();
+		}
+	});
+
+	HttpRequest->ProcessRequest();
+}
+
+FTimespan USequenceRPCManager::GetTimeShiftFromResponse(const FString& DateHeader)
+{
+	FDateTime ServerTime;
+	if (FDateTime::ParseHttpDate(DateHeader, ServerTime))
+	{
+		const FDateTime LocalTime = FDateTime::UtcNow();
+		return ServerTime - LocalTime;
+	}
+	
+	UE_LOG(LogTemp, Warning, TEXT("Failed to parse server time from date header: %s"), *DateHeader);
+	return FTimespan::Zero();
 }

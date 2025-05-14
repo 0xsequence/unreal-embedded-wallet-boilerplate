@@ -12,26 +12,28 @@ class SEQUENCEPLUGIN_API UERC721SaleContract : public UObject
     GENERATED_BODY()
 
 public:
-
     UERC721SaleContract();
 
-    UERC721SaleContract(FString ContractAddress, FString PaymentToken, int32 MaxTotal, FString Data);
+    UFUNCTION(BlueprintCallable, Category = "ERC721 Sale")
+    static UERC721SaleContract* Create(const FString& ContractAddress, const FString& PaymentToken, int32 MaxTotal, const FString& Data);
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn = true), Category = "ERC721 Sale")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn = true), Category = "0xSequence - ERC721 Sale")
     FString ContractAddress;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn = true), Category = "ERC721 Sale")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn = true), Category = "0xSequence - ERC721 Sale")
     FString PaymentToken;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn = true), Category = "ERC721 Sale")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn = true), Category = "0xSequence - ERC721 Sale")
     int32 MaxTotal;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn = true), Category = "ERC721 Sale")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn = true), Category = "0xSequence - ERC721 Sale")
     FString Data;
 
-    UFUNCTION(BlueprintCallable, Category = "ERC721 Sale")
+    UFUNCTION(BlueprintCallable, Category = "0xSequence - ERC721 Sale")
     FRawTransaction MakePurchaseTransaction(const FString& ToAddress, const int32& Amount, const TArray<FString>& Proof);
 
     FContractCall GetSaleDetails();
 
+private:
+    void Init(const FString& InContractAddress, const FString& InPaymentToken, int32 InMaxTotal, const FString& InData);
 };

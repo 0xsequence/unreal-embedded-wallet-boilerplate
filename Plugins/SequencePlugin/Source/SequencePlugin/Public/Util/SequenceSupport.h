@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "JsonObjectConverter.h"
+#include "Log.h"
 #include "Containers/Union.h"
 #include "Types/Types.h"
 #include "Util/Structs/BE_Structs.h"
@@ -23,9 +24,9 @@ struct SEQUENCEPLUGIN_API FIdNamePair
 {
 	GENERATED_USTRUCT_BODY()
 	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Network Data")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="0xSequence")
 	int64 NetworkId = -1;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Network Data")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="0xSequence")
 	FString NetworkName = "";
 
 	FIdNamePair(){}
@@ -52,10 +53,13 @@ private:
 	static inline TMap<int64, FString> NetworkIdToUrlMap = {
 		FIdName(1,TEXT("mainnet")),
 		FIdName(10,TEXT("optimism")),
+		FIdName(40,TEXT("telos")),
 		FIdName(56,TEXT("bsc")),
 		FIdName(100,TEXT("gnosis")),
 		FIdName(137,TEXT("polygon")),
+		FIdName(273,TEXT("xr1")),
 		FIdName(1101,TEXT("polygon-zkevm")),
+		FIdName(1284,TEXT("moonbeam")),
 		FIdName(1868,TEXT("soneium")),
 		FIdName(6283,TEXT("laos")),
 		FIdName(7668,TEXT("rootnet")),
@@ -66,23 +70,30 @@ private:
 		FIdName(33139,TEXT("apechain")),
 		FIdName(42161,TEXT("arbitrum")),
 		FIdName(42170,TEXT("arbitrum-nova")),
+		FIdName(42793,TEXT("etherlink")),
 		FIdName(43114,TEXT("avalanche")),
 		FIdName(81457,TEXT("blast")),
 		FIdName(660279,TEXT("xai")),
 		FIdName(1482601649,TEXT("skale-nebula")),
 		
+		FIdName(41,TEXT("telos-testnet")),
 		FIdName(97,TEXT("bsc-testnet")),
+		FIdName(1287,TEXT("moonbase-alpha")),
 		FIdName(1946,TEXT("soneium-minato")),
 		FIdName(1993,TEXT("b3-sepolia")),
 		FIdName(2730,TEXT("xr-sepolia")),
 		FIdName(7672,TEXT("rootnet-porcini")),
+		FIdName(10143,TEXT("monad-testnet")),
 		FIdName(13473,TEXT("immutable-zkevm-testnet")),
 		FIdName(33111,TEXT("apechain-testnet")),
 		FIdName(40875,TEXT("homeverse-testnet")),
 		FIdName(43113,TEXT("avalanche-testnet")),
+		FIdName(50312,TEXT("somnia-testnet")),
+		FIdName(53716,TEXT("frequency-testnet")),
 		FIdName(62850,TEXT("laos-sigma-testnet")),
 		FIdName(80002,TEXT("amoy")),
 		FIdName(84532,TEXT("base-sepolia")),
+		FIdName(128123,TEXT("etherlink-testnet")),
 		FIdName(421614,TEXT("arbitrum-sepolia")),
 		FIdName(11155111,TEXT("sepolia")),
 		FIdName(11155420,TEXT("optimism-sepolia")),
@@ -112,6 +123,10 @@ private:
 		FIdName(6283,TEXT("LAOS")),
 		FIdName(7668,TEXT("Root Network")),
 		FIdName(1868,TEXT("Soneium")),
+		FIdName(40,TEXT("Telos")),
+		FIdName(1284,TEXT("Moonbeam")),
+		FIdName(42793, TEXT("Etherlink")),
+		FIdName(273, TEXT("XR1")),
 		
 		FIdName(13473,TEXT("Immutable Testnet")),
 		FIdName(97,TEXT("BNB Smart Chain Testnet")),
@@ -132,6 +147,12 @@ private:
 		FIdName(37714555429,TEXT("Xai Sepolia")),
 		FIdName(62850,TEXT("LAOS Sigma Testnet")),
 		FIdName(7672,TEXT("Root Network Porcini Testnet")),
+		FIdName(41,TEXT("Telos Testnet")),
+		FIdName(1287,TEXT("Moonbase Alpha")),
+		FIdName(128123,TEXT("Etherlink Testnet")),
+		FIdName(10143,TEXT("Monad Testnet")),
+		FIdName(50312,TEXT("Somnia Testnet")),
+		FIdName(53716,TEXT("Frequency Testnet")),
 	};
 
 	static inline TMap<FString, int64> NetworkNameToIdMap = {
@@ -155,6 +176,10 @@ private:
 		FNameId(TEXT("laos"),6283),
 		FNameId(TEXT("rootnet"),7668),
 		FNameId(TEXT("soneium"),1868),
+		FNameId(TEXT("telos"),40),
+		FNameId(TEXT("moonbeam"),1284),
+		FNameId(TEXT("etherlink"),42793),
+		FNameId(TEXT("xr1"),273),
 		
 		FNameId(TEXT("immutable-testnet"),13473),
 		FNameId(TEXT("bnbsmartchaintestnet"),97),
@@ -175,6 +200,12 @@ private:
 		FNameId(TEXT("xaisepolia"),37714555429),
 		FNameId(TEXT("laos-sigma"),62850),
 		FNameId(TEXT("rootnet-porcini"),7672),
+		FNameId(TEXT("telos-testnet"), 41),
+		FNameId(TEXT("moonbase-alpha"),1287),
+		FNameId(TEXT("etherlink-testnet"),128123),
+		FNameId(TEXT("monad-testnet"),10143),
+		FNameId(TEXT("somnia-testnet"),50312),
+		FNameId(TEXT("frequency-testnet"),53716),
 	};
 	
 	static inline TMap<ENetwork, int64> NetworkEnumToIdMap = {
@@ -198,6 +229,10 @@ private:
 		{ENetwork::LAOS, 6283},
 		{ENetwork::Root, 7668},
 		{ENetwork::Soneium, 1868},
+		{ENetwork::Telos, 40},
+		{ENetwork::Moonbeam, 1284},
+		{ENetwork::Etherlink, 42793},
+		{ENetwork::XR1, 273},
 		
 		{ENetwork::ImmutableTestnet, 13473},
 		{ENetwork::BNBSmartChainTestnet, 97},
@@ -218,6 +253,12 @@ private:
 		{ENetwork::XaiSepolia, 37714555429},
 		{ENetwork::LAOSSigma, 62850},
 		{ENetwork::RootPorcini, 7672},
+		{ENetwork::TelosTestnet, 41},
+		{ENetwork::MoonbaseAlpha, 1287},
+		{ENetwork::EtherlinkTestnet, 128123},
+		{ENetwork::MonadTestnet, 10143},
+		{ENetwork::SomniaTestnet, 50312},
+		{ENetwork::FrequencyTestnet, 53716},
 	};
 
 	static inline TMap<ENetwork, FString> NetworkEnumToNameMap = {
@@ -241,6 +282,10 @@ private:
 		{ENetwork::LAOS, TEXT("LAOS")},
 		{ENetwork::Root, TEXT("Root Network")},
 		{ENetwork::Soneium, TEXT("Soneium")},
+		{ENetwork::Telos, TEXT("Telos")},
+		{ENetwork::Moonbeam, TEXT("Moonbeam")},
+		{ENetwork::Etherlink, TEXT("Etherlink")},
+		{ENetwork::XR1, TEXT("XR1")},
 		
 		{ENetwork::ImmutableTestnet, TEXT("Immutable Testnet")},
 		{ENetwork::BNBSmartChainTestnet, TEXT("BNB Smart Chain Testnet")},
@@ -261,6 +306,12 @@ private:
 		{ENetwork::XaiSepolia, TEXT("Xai Sepolia")},
 		{ENetwork::LAOSSigma, TEXT("LAOS Sigma Testnet")},
 		{ENetwork::RootPorcini, TEXT("Root Network Porcini Testnet")},
+		{ENetwork::TelosTestnet, TEXT("Telos Testnet")},
+		{ENetwork::MoonbaseAlpha, TEXT("Moonbase Alpha")},
+		{ENetwork::EtherlinkTestnet, TEXT("Etherlink Testnet")},
+		{ENetwork::MonadTestnet, TEXT("Monad Testnet")},
+		{ENetwork::SomniaTestnet, TEXT("Somnia Testnet")},
+		{ENetwork::FrequencyTestnet, TEXT("Frequency Testnet")},
 	};
 
 public:
@@ -364,6 +415,7 @@ public:
 	{
 		FString Ret;
 		FJsonObjectConverter::UStructToJsonObjectString<T>(StructVar, Ret, 0, 0);
+		StringReplace(&Ret, "\n", "");
 		return Ret;
 	}
 
@@ -403,11 +455,11 @@ public:
 		if (FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(JSON), JsonObj))
 		{
 			if (!FJsonObjectConverter::JsonObjectToUStruct<T>(JsonObj.ToSharedRef(), &Ret))
-				UE_LOG(LogTemp, Error, TEXT("[Failed to convert jsonObject into a UStruct: [%s]]"), *JSON);
+				SEQ_LOG(Error, TEXT("[Failed to convert jsonObject into a UStruct: [%s]]"), *JSON);
 		}
 		else
 		{//failed to convert the decrypted string into a jsonObject
-			UE_LOG(LogTemp, Error, TEXT("[Failed to convert jsonObjectString into a jsonObject: [%s]]"), *JSON);
+			SEQ_LOG(Error, TEXT("[Failed to convert jsonObjectString into a jsonObject: [%s]]"), *JSON);
 		}
 
 		return Ret;
@@ -428,12 +480,12 @@ public:
 			}
 			else
 			{
-				UE_LOG(LogTemp, Error, TEXT("[Failed to convert jsonObject into a UStruct: [%s]]"), *JSON);
+				SEQ_LOG(Error, TEXT("[Failed to convert jsonObject into a UStruct: [%s]]"), *JSON);
 			}
 		}
 		else
 		{//failed to convert the decrypted string into a jsonObject
-			UE_LOG(LogTemp, Error, TEXT("[Failed to convert jsonObjectString into a jsonObject: [%s]]"), *JSON);
+			SEQ_LOG(Error, TEXT("[Failed to convert jsonObjectString into a jsonObject: [%s]]"), *JSON);
 		}
 
 		return Ret;
@@ -476,4 +528,5 @@ private:
 	* some special edge cases from json responses / parsing as well!
 	*/
 	static FString StringCleanup(FString String);
+	static void StringReplace(FString* Input, const FString& Search, const FString& Replacement);
 };
