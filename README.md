@@ -1,3 +1,11 @@
+<!-- archived-repository-notice -->
+> [!WARNING]
+> **This repository is archived and no longer maintained.**
+>
+> It is part of the legacy Sequence stack and is kept here for reference only.
+> It will not receive bug fixes, security patches or releases, and packages,
+> images or deployments built from it are not supported.
+
 # Sequence Unreal Embedded Wallet Boilerplate
 
 [![Docs](https://img.shields.io/badge/Documentation-7334f8)](https://docs.sequence.xyz/sdk/unreal/overview)
